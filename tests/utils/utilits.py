@@ -60,16 +60,55 @@ class DoctorCard(BaseModel):
         return super().__getattr__(item)
 
 
-class CardV2(DoctorCard):
-    id: int
-    rta_id: str | None
-    price_group: Optional[PricesGroup] = Field(alias="price_groups")
+##########################################################
 
-    @field_validator("price_group", mode='before')
-    def extract_first_price_group(cls, price_groups):
-        if isinstance(price_groups, list) and price_groups:
-            return price_groups[0]
-        return None
+class WorkplaceV2:
+    workplace_fields = ('id', 'rta_id')
+
+
+    def _set_fields_as_none(self):
+        for field in self.workplace_fields:
+            self.__setattr__(field, None)
+
+    def __init__(self, workplace: dict):
+        if isinstance(workplace, dict):
+            for field in self.workplace_fields:
+                if field in workplace.keys():
+                    self.__setattr__(field, workplace[field])
+                else:
+                    self.__setattr__(field, None)
+            # if 'price_groups' in workplace.keys() and workplace['price_groups']:
+
+        else:
+            self._set_fields_as_none()
+
+
+class DoctorCardV2:
+
+    root_fields = ('id', 'code', 'name', 'rating')
+    price_fields= ('id', 'service_id', 'price', 'title')
+
+    def _set_fields_as_none(self):
+        for field in self.root_fields:
+            self.__setattr__(field, None)
+
+    def __init__(self, card_data: dict):
+        if isinstance(card_data, dict):
+            for field in self.root_fields:
+                if field in card_data.keys():
+                    self.__setattr__(field, card_data[field])
+                else:
+                    self.__setattr__(field, None)
+            if 'workplaces' in card_data.keys() and card_data['workplaces']:
+                wp = WorkplaceV2(card_data['workplaces'][0])
+                self.__setattr__('workplace', wp)
+            else:
+                self.__setattr__('workplace', None)
+        else:
+            self._set_fields_as_none()
+            self.workplace = None
+
+###########################################################
 
 
 def parse_listing_data(data: dict):
@@ -77,6 +116,10 @@ def parse_listing_data(data: dict):
     if listing_items is None:
         return None
 
+    a = DoctorCardV2(listing_items[0])
+    aa = DoctorCardV2({})
+    b = DoctorCardV2(['asd', 'dasd', 12312, None])
+    c = DoctorCardV2({'asd': 1, 2123: 'asdas', 'www': 'www'})
     doctors: list[DoctorCard] = []
     for item in listing_items:
         doctors.append(DoctorCard.model_validate(item))
