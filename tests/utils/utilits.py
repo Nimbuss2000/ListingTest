@@ -1,170 +1,101 @@
 import requests
-from typing import Optional
+from typing import Optional, TYPE_CHECKING, TypeVar, Type
 from config import BaseConfig
 from tests.utils.urls import UrlParamsBuilder
 from pydantic import BaseModel, field_validator, Field
 
 
-class Price(BaseModel):
-    id: int
-    service_id: int | None
+class NestedCard:
+    _layer_fields: tuple
+    _sub_layer_alias: Optional[str]
+    _sub_layer_name: Optional[str]
+    _sub_layer_obj: Optional[Type["NestedCard"]]
+
+    def _set_fields_as_none(self):
+        for field in self._layer_fields:
+            setattr(self, field, None)
+
+    def _fields_setting(self, data: dict):
+        for field in self._layer_fields:
+            if field in data.keys():
+                setattr(self, field, data[field])
+            else:
+                setattr(self, field, None)
+
+    def _layer_setting(self, data: dict):
+        if self._sub_layer_obj and self._sub_layer_name and self._sub_layer_alias:
+            if self._sub_layer_name in data.keys() and data[self._sub_layer_name]:
+                slo = self._sub_layer_obj(data[self._sub_layer_name][0])
+            else:
+                slo = self._sub_layer_obj()
+            setattr(self, self._sub_layer_alias, slo)
 
 
-class PricesGroup(BaseModel):
-    discount: int
-    price: Optional[Price] = Field(alias='prices')
+    def __init__(self, layer_data: dict | None = None):
+        if isinstance(layer_data, dict) and layer_data:
+            self._fields_setting(layer_data)
+            self._layer_setting(layer_data)
+        else:
+            self._set_fields_as_none()
+            if self._sub_layer_obj and self._sub_layer_alias:
+                setattr(self, self._sub_layer_alias, self._sub_layer_obj())
 
-    @field_validator("price", mode='before')
-    def extract_first_price(cls, prices):
+
+class Price(NestedCard):
+
+    __slots__ = ('id', 'service_id')
+
+    _layer_fields: tuple = ('id', 'service_id')
+    _sub_layer_alias = None
+    _sub_layer_name = None
+    _sub_layer_obj = None
+
+
+    def _fields_setting(self, data: dict):
+        prices = data.get('prices', None)
         if isinstance(prices, list) and prices:
-            return prices[0]
-        return None
-
-
-class Workplace(BaseModel):
-    id: int
-    rta_id: str | None
-    price_group: Optional[PricesGroup] = Field(alias="price_groups")
-
-    @field_validator("price_group", mode='before')
-    def extract_first_price_group(cls, price_groups):
-        if isinstance(price_groups, list) and price_groups:
-            return price_groups[0]
-        return None
-
-
-class DoctorCard(BaseModel):
-    id: int
-    code: str
-    rating: float
-    workplace: Optional[Workplace] = Field(alias="workplaces")
-
-    @field_validator("workplace", mode='before')
-    def extract_first_workplace(cls, workplaces):
-        if isinstance(workplaces, list) and workplaces:
-            return workplaces[0]
-        return None
-
-    def get_service(self) -> int | None:
-        if self.workplace and self.workplace.price_group and self.workplace.price_group.price:
-            return self.workplace.price_group.price.service_id
-        else:
-            return None
-
-    def __getattr__(self, item):
-        if item == 'rta_id':
-            if self.workplace:
-                return self.workplace.rta_id
-            else:
-                return None
-        return super().__getattr__(item)
-
-
-##########################################################
-
-class WorkplaceV2:
-    workplace_fields = ('id', 'rta_id')
-
-
-    def _set_fields_as_none(self):
-        for field in self.workplace_fields:
-            self.__setattr__(field, None)
-
-    def __init__(self, workplace: dict):
-        if isinstance(workplace, dict):
-            for field in self.workplace_fields:
-                if field in workplace.keys():
-                    self.__setattr__(field, workplace[field])
+            for field in self._layer_fields:
+                if field in prices[0]:
+                    setattr(self, field, prices[0][field])
                 else:
-                    self.__setattr__(field, None)
-            # if 'price_groups' in workplace.keys() and workplace['price_groups']:
-
+                    setattr(self, field, None)
         else:
             self._set_fields_as_none()
 
 
-class DoctorCardV2:
+class Workplace(NestedCard):
 
-    root_fields = ('id', 'code', 'name', 'rating')
-    price_fields= ('id', 'service_id', 'price', 'title')
+    __slots__ = ('price', 'id', 'rta_id')
 
-    def _set_fields_as_none(self):
-        for field in self.root_fields:
-            self.__setattr__(field, None)
-
-    def __init__(self, card_data: dict):
-        if isinstance(card_data, dict):
-            for field in self.root_fields:
-                if field in card_data.keys():
-                    self.__setattr__(field, card_data[field])
-                else:
-                    self.__setattr__(field, None)
-            if 'workplaces' in card_data.keys() and card_data['workplaces']:
-                wp = WorkplaceV2(card_data['workplaces'][0])
-                self.__setattr__('workplace', wp)
-            else:
-                self.__setattr__('workplace', None)
-        else:
-            self._set_fields_as_none()
-            self.workplace = None
-
-###########################################################
+    _layer_fields: tuple = ('id', 'rta_id')
+    _sub_layer_alias: str = 'price'
+    _sub_layer_name: str = 'price_groups'
+    _sub_layer_obj: Price = Price
 
 
-def parse_listing_data(data: dict):
+
+class DoctorCard(NestedCard):
+    __slots__ = ('workplace', 'id', 'code', 'name', 'rating')
+
+    _layer_fields: tuple = ('id', 'code', 'name', 'rating')
+    _sub_layer_alias: str = 'workplace'
+    _sub_layer_name: str = 'workplaces'
+    _sub_layer_obj: Workplace = Workplace
+
+
+def parse_listing_data(data: dict) -> list[DoctorCard] | None:
     listing_items: list | None = data.get('items', None)
     if listing_items is None:
         return None
 
-    a = DoctorCardV2(listing_items[0])
-    aa = DoctorCardV2({})
-    b = DoctorCardV2(['asd', 'dasd', 12312, None])
-    c = DoctorCardV2({'asd': 1, 2123: 'asdas', 'www': 'www'})
     doctors: list[DoctorCard] = []
     for item in listing_items:
-        doctors.append(DoctorCard.model_validate(item))
+        doctors.append(DoctorCard(item))
     return doctors
 
 
-def fetch_data(url_params_obj: UrlParamsBuilder):
+def fetch_data(url_params_obj: UrlParamsBuilder) -> requests.Response:
     payload = url_params_obj.get_query_params()
     url = "/".join((BaseConfig.base_url, url_params_obj.listing))
     r = requests.get(url, params=payload)
     return r
-
-
-
-# class ListingDoctor:
-#     doctor_id: int = None
-#     code: str = None
-#     name: str = None
-#     rating: int = None
-#     responses_count: int = None
-#     scores_count: int = None
-#     workplace: int = None
-#     rtaId: str = None
-#     clinic_id: int = None
-#     service_id: int = None
-#
-#
-# class ListingDoctors:
-#     def get_doctors(self, request_json):
-#         items = request_json['data']['items']
-#         self.listing_doctors = {}
-#         for count, item in enumerate(items):
-#             doctor = ListingDoctor()
-#             doctor.doctor_id = item['id']
-#             doctor.code = item['code']
-#             doctor.name = item['name']
-#             doctor.rating = item['rating']
-#             doctor.responses_count = item['responses_count']
-#             doctor.scores_count = item['scores_count']
-#             doctor.workplace = item['workplaces'][0]['id']
-#             doctor.rtaId = item['workplaces'][0]['rta_id']
-#             doctor.clinic_id = item['workplaces'][0]['clinic']['id']
-#             doctor.service_id = item['workplaces'][0]['price_groups'][0]['prices'][0]['service_id']
-#             self.listing_doctors[count] = doctor
-#
-#     def get_rta_ids(self):
-#         return [self.listing_doctors[d].rtaId for d in self.listing_doctors]
-

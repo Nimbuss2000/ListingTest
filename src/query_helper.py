@@ -1,12 +1,24 @@
 from itertools import repeat
 
+
+
+class DoctorFromDb:
+
+    __slots__ =  (
+    'cli_name', 'doc_name', 'doc_id', 'workplace_id', 'service_id', 'sign_sub_type', 'cpa_index', 'sort_rating_rate')
+
+    def __init__(self, data):
+        for v, name in zip(data, self.__slots__):
+            setattr(self, name, v)
+
+
 query_doctors = '''
 with wpInfo as (
     select workplace_id, doctor_id, clinic_id, service_id
     from rta.rta_workplaces
     where uuid in ({})
 )
-select c.name, d.name, wi.workplace_id, wi.service_id, wi.sign_sub_type, wci.cpa_index, dci.sort_rating_rate 
+select c.name, d.name, d.id, wi.workplace_id, wi.service_id, wi.sign_sub_type, wci.cpa_index, dci.sort_rating_rate 
 from wpInfo wpi
  join listing.workplace_indexes wi on wi.workplace_id = wpi.workplace_id
                                           and (wi.service_id = wpi.service_id

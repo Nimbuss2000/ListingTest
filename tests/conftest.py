@@ -29,7 +29,8 @@ def db_get_data(db_con):
         q = query_helper.query_doctors.format(s)
         db_con.execute(q)
         data = db_con.fetchall()
-        return data
+        db_cards = [query_helper.DoctorFromDb(row) for row in data]
+        return db_cards
     yield get_request_data
 
 
