@@ -1,5 +1,6 @@
 from itertools import repeat
 
+from tests.utils.utilits import DoctorListing
 
 
 class DoctorFromDb:
@@ -29,3 +30,14 @@ from wpInfo wpi
  join doctor_computed_infos dci on dci.id = wpi.doctor_id
 order by wi.sign_sub_type desc, wci.cpa_index desc, dci.sort_rating_rate desc
 '''
+
+
+class DoctorQueryGen:
+
+
+
+    def __init__(self, data: DoctorListing, per_page: int = 20):
+        if data.cards_workplaces:
+            self.need_doctor_queries = True if len(data.cards_workplaces) < per_page else False
+        else:
+            self.need_doctor_queries = True

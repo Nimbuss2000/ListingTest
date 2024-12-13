@@ -5,7 +5,7 @@ from copy import deepcopy
 
 class UrlParamsBuilder:
     with_meta: int = 1
-    per_page: int = 20
+    per_page: int = 50 #20
     only_sign: int = 0
     only_high_rating: int = 0
 

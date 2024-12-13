@@ -3,6 +3,7 @@ from typing import Optional, TYPE_CHECKING, TypeVar, Type
 from config import BaseConfig
 from tests.utils.urls import UrlParamsBuilder
 from pydantic import BaseModel, field_validator, Field
+from collections import defaultdict, Counter
 
 
 class NestedCard:
@@ -30,7 +31,6 @@ class NestedCard:
                 slo = self._sub_layer_obj()
             setattr(self, self._sub_layer_alias, slo)
 
-
     def __init__(self, layer_data: dict | None = None):
         if isinstance(layer_data, dict) and layer_data:
             self._fields_setting(layer_data)
@@ -50,7 +50,6 @@ class Price(NestedCard):
     _sub_layer_name = None
     _sub_layer_obj = None
 
-
     def _fields_setting(self, data: dict):
         prices = data.get('prices', None)
         if isinstance(prices, list) and prices:
@@ -64,14 +63,12 @@ class Price(NestedCard):
 
 
 class Workplace(NestedCard):
-
     __slots__ = ('price', 'id', 'rta_id')
 
     _layer_fields: tuple = ('id', 'rta_id')
     _sub_layer_alias: str = 'price'
     _sub_layer_name: str = 'price_groups'
     _sub_layer_obj: Price = Price
-
 
 
 class DoctorCard(NestedCard):
@@ -83,14 +80,38 @@ class DoctorCard(NestedCard):
     _sub_layer_obj: Workplace = Workplace
 
 
-def parse_listing_data(data: dict) -> list[DoctorCard] | None:
+class DoctorListing:
+
+    def __init__(self):
+        self.doctor_cards: list[DoctorCard] = []
+        self.cards_workplaces: list[int] = []
+        self.doc_ids: list[int] = []
+        self.service_ids: Counter = Counter()
+
+    def add_card(self, card: DoctorCard):
+        self.doctor_cards.append(card)
+        if card.id:
+            self.doc_ids.append(card.id)
+        if card.workplace.id:
+            self.cards_workplaces.append(card.workplace.id)
+        if card.workplace.price.service_id:
+            self.service_ids[card.workplace.price.service_id] += 1
+
+    def get_service_ids(self) -> Optional[int]:
+        if self.service_ids:
+            return self.service_ids.most_common(1)[0][0]
+        return None
+
+
+def parse_listing_data(data: dict) -> DoctorListing | None:
     listing_items: list | None = data.get('items', None)
     if listing_items is None:
         return None
 
-    doctors: list[DoctorCard] = []
+    doctors = DoctorListing()
     for item in listing_items:
-        doctors.append(DoctorCard(item))
+        doctors.add_card(DoctorCard(item))
+
     return doctors
 
 
