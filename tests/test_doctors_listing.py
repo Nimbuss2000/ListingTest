@@ -12,7 +12,7 @@ speciality_service = namedtuple('specs', ['speciality', 'service'])
 # test data
 spec_serv: list[speciality_service] = [speciality_service(6427, 1134067),
                                           speciality_service(6457, 1134075)]
-pages = [2]
+pages = [47]
 ages = [Ages.adult]
 
 
@@ -32,7 +32,7 @@ def test_base_doctor_sort(spec: speciality_service, page, db_con):
     parsed_data: Optional[DoctorListing] = parse_response_data(response_data)
     assert parsed_data is not None, f"No items in data"
 
-    a = db_helper.doctors_db_request(db_con, parsed_data)
+    a = db_helper.doctors_db_request(db_con, parsed_data, spec.service)
     z = 0
 
     assert True, "Web not equal DB"
