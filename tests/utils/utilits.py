@@ -1,7 +1,7 @@
 import requests
 from typing import Optional, TYPE_CHECKING, TypeVar, Type
 from config import BaseConfig
-from tests.utils.urls import UrlParamsBuilder
+from tests.utils.urls import DoctorsQueryBuilder
 from pydantic import BaseModel, field_validator, Field
 from collections import defaultdict, Counter
 
@@ -103,8 +103,8 @@ class DoctorListing:
         return None
 
 
-def parse_listing_data(data: dict) -> DoctorListing | None:
-    listing_items: list | None = data.get('items', None)
+def parse_response_data(data: dict) -> Optional[DoctorListing]:
+    listing_items: Optional[list] = data.get('items', None)
     if listing_items is None:
         return None
 
@@ -115,8 +115,7 @@ def parse_listing_data(data: dict) -> DoctorListing | None:
     return doctors
 
 
-def fetch_data(url_params_obj: UrlParamsBuilder) -> requests.Response:
-    payload = url_params_obj.get_query_params()
-    url = "/".join((BaseConfig.base_url, url_params_obj.listing))
-    r = requests.get(url, params=payload)
-    return r
+def get_response(url_query: dict[str: str], listing: str) -> requests.Response:
+    url = "/".join((BaseConfig.base_url, listing))
+    return requests.get(url, params=url_query)
+

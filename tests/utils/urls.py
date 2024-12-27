@@ -1,45 +1,73 @@
+from enum import Enum
+from pydantic import Field
+from pydantic.dataclasses import dataclass
+
+
+# Examples
 # http://web-api.larionov.polygon.dev-napopravku.ru/api-internal/doctors/?city_code=spb&sort_by=appointment&with_meta=1&page=1&per_page=20&only_sign=0&only_high_rating=0&speciality_id=6480&age_type=adult
-from copy import deepcopy
+# http://web-api.larionov.polygon.dev-napopravku.ru/api-internal/clinics/?city_code=spb&sort_by=appointment&with_meta=1&page=1&per_page=20&only_sign=0&only_high_rating=0&service_id=934554&is_all_day=0&section_name=service
 
-#todo добавить enum-ы как параметры объекта. + добавить pydentic
+# class QueriesEnum(Enum):
+#     @classmethod
+#     def values(cls) -> tuple:
+#         return tuple(item.value for item in cls)
 
-class UrlParamsBuilder:
-    with_meta: int = 1
-    per_page: int = 50 #20
-    only_sign: int = 0
-    only_high_rating: int = 0
+class Listings(Enum):
+    doctors = 'doctors'
+    clinics = 'clinics'
 
-    listing: str
-    city_code: str
-    sort_by: str
-    page: int
-    speciality_id: int
-    age_type: str
+class Ages(Enum):
+    adult = 'adult'
+    child = 'child'
 
-    def __init__(self,
-                 listing:str="doctors",
-                 city_code:str="spb",
-                 sort_by:str="appointment",
-                 page:int=1,
-                 speciality_id:int=6480,
-                 age_type:str="adult"):
+class Sorts(Enum):
+    appointment = 'appointment'
+    rating = 'rating'
+    price = 'price'
+    response = 'response'
 
-        self.listing = listing
-        self.city_code = city_code
-        self.sort_by = sort_by
-        self.page = page
-        self.speciality_id = speciality_id
-        self.age_type = age_type
 
-    def get_query_params(self):
-        req_params = {k: v for k, v in self.__dict__.items() if k != "listing"}
-        opt_params = {k: v for k, v in self.__class__.__dict__.items() if not k.startswith('__') and not callable(v)}
-        req_params.update(opt_params)
-        return req_params
+@dataclass
+class DoctorsQueryBuilder:
+    """
+    By default: ?city_code=spb
+                &sort_by=appointment
+                &with_meta=1
+                &page=1
+                &per_page=20
+                &only_sign=0
+                &only_high_rating=0
+                &speciality_id=6480
+                &age_type=adult
+    """
 
-    def set_optional_params(self, **kwargs):
-        for k, v in kwargs.items():
-            try:
-                self.k = v
-            except Exception:
-                print('Cant find param')
+    city_code: str = 'spb'
+    sort_by: Sorts = Sorts.appointment
+    with_meta: int = Field(ge=0, le=1, default=1)
+    page: int = Field(ge=0, default=1)
+    per_page: int =  Field(ge=1, le=50, default=20)
+    only_sign: int = Field(ge=0, le=1, default=0)
+    only_high_rating: int = Field(ge=0, le=1, default=0)
+    speciality_id: int = 6480
+    age_type: Ages = Ages.adult
+
+    def get_query(self) -> str:
+        params_list = []
+        for param, value in self.__dict__.items():
+            if issubclass(value.__class__, Enum):
+                params_list.append(f'{param}={value.value}')
+            else:
+                params_list.append(f'{param}={value}')
+
+        # return '?'+'&'.join([f'{param}={value}' for param, value in self.__dict__.items()])
+        return '?'+'&'.join(params_list)
+
+
+    def get_dict(self) -> dict[str: str]:
+        payload = {}
+        for param, value in self.__dict__.items():
+            if issubclass(value.__class__, Enum):
+                payload[param] = value.value
+            else:
+                payload[param] = value
+        return payload

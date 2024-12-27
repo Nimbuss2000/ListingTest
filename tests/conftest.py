@@ -17,7 +17,7 @@ def db_con():
                           password=BaseConfig.db_conn['password'],
                           port=BaseConfig.db_conn['port'])
     cursor = db.cursor()
-    yield  cursor
+    yield cursor
     cursor.close()
     db.close()
 
