@@ -1,5 +1,5 @@
 from psycopg2.extensions import cursor
-from tests.utils.utilits import DoctorListing
+from tests.utils.utilits import DoctorListing, DoctorCardDB
 
 
 # d_name (name), w_id (wid), d_id (did), service_id, rating, sign_sub_type, cpa_index, sort_rating_rate
@@ -53,27 +53,49 @@ select d.name, null as wid, d.id did, null as service_id, dci.rating, null as si
 where d.id in ({})
 '''
 
-def doctors_db_request(db: cursor, data: DoctorListing, service_id: int):
+
+# class DoctorCardDB:
+#     __slots__ = ('name', 'wid', 'did', 'service_id', 'rating', 'sign_sub_type', 'cpa_index', 'sort_rating_rate')
+#
+#     def __init__(self, args):
+#         for pos, field in enumerate(self.__slots__):
+#             setattr(self, field, args[pos])
+
+
+# class DBDoctorCards:
+#
+#     def __init__(self, cards):
+#         self.cards = []
+#
+#         if cards:
+#             for card in cards:
+#                 self.add_card(card)
+#
+#     def add_card(self, card):
+#         self.cards.append(DoctorCardDB(card))
+
+
+def doctors_db_request(db: cursor, data: DoctorListing, service_id: int) -> DoctorListing:
 
     cards_num = len(data.doctor_cards)
 
     if data.cards_workplaces:
+        q_workplaces = ",".join(map(str, data.cards_workplaces))
+
         if len(data.cards_workplaces) < cards_num:
-            q_workplaces = ",".join(map(str, data.cards_workplaces))
             q_doctors = ",".join(map(str, data.doc_ids))
             q = query_doctors_workplaces.format(q_workplaces, service_id, q_doctors)
-            db.execute(q)
-            r = db.fetchall()
-            return r
         else:
-            q_workplaces = ",".join(str(data.cards_workplaces))
             q = query_only_workplaces.format(q_workplaces, service_id)
-            db.execute(q)
-            r = db.fetchall()
-            return r
     else:
         q_doctors = ",".join(map(str, data.doc_ids))
         q = query_only_doctors.format(q_doctors, service_id)
-        db.execute(q)
-        r = db.fetchall()
-        return r
+
+    db.execute(q)
+    r = db.fetchall()
+    cards = DoctorListing()
+    for row_card in r:
+        card = DoctorCardDB(row_card)
+        cards.add_card(card)
+
+    return cards

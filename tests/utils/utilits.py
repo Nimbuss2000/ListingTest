@@ -1,5 +1,5 @@
 import requests
-from typing import Optional, TYPE_CHECKING, TypeVar, Type
+from typing import Optional, TYPE_CHECKING, TypeVar, Type, Union
 from config import BaseConfig
 from tests.utils.urls import DoctorsQueryBuilder
 from pydantic import BaseModel, field_validator, Field
@@ -81,28 +81,40 @@ class DoctorCard(NestedCard):
     _sub_layer_obj: Workplace = Workplace
 
 
-# @dataclass
-# class WOD:
-#     wps: list
-#     doc: list
+class DoctorCardDB:
+    __slots__ = ('name', 'wid', 'did', 'service_id', 'rating', 'sign_sub_type', 'cpa_index', 'sort_rating_rate')
+
+    def __init__(self, args):
+        for pos, field in enumerate(self.__slots__):
+            setattr(self, field, args[pos])
+
 
 class DoctorListing:
 
     def __init__(self):
-        self.doctor_cards: list[DoctorCard] = []
+        self.doctor_cards: Union[list[DoctorCard], list[DoctorCardDB]] = []
         self.cards_workplaces: list[int] = []
         self.doc_ids: list[int] = []
-        # self.wps_or_doc: WOD = WOD([], [])
 
-    def add_card(self, card: DoctorCard):
+    def add_card(self, card: Union[DoctorCard, DoctorCardDB]):
         self.doctor_cards.append(card)
-        self.doc_ids.append(card.id)
 
-        if card.workplace.id:
-            self.cards_workplaces.append(card.workplace.id)
-        #     self.wps_or_doc.wps.append(card.workplace.id)
-        # else:
-        #     self.wps_or_doc.doc.append(card.id)
+        if isinstance(card, DoctorCard):
+            self.doc_ids.append(card.id)
+
+            if card.workplace.id:
+                self.cards_workplaces.append(card.workplace.id)
+        elif isinstance(card, DoctorCardDB):
+            self.doc_ids.append(card.did)
+
+            if card.wid:
+                self.cards_workplaces.append(card.wid)
+
+    def __eq__(self, other):
+        wps_eq = self.cards_workplaces == other.cards_workplaces
+        doc_eq = self.doc_ids == other.doc_ids
+        return wps_eq and doc_eq
+
 
 
 def parse_response_data(data: dict) -> Optional[DoctorListing]:
