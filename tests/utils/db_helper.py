@@ -54,27 +54,6 @@ where d.id in ({})
 '''
 
 
-# class DoctorCardDB:
-#     __slots__ = ('name', 'wid', 'did', 'service_id', 'rating', 'sign_sub_type', 'cpa_index', 'sort_rating_rate')
-#
-#     def __init__(self, args):
-#         for pos, field in enumerate(self.__slots__):
-#             setattr(self, field, args[pos])
-
-
-# class DBDoctorCards:
-#
-#     def __init__(self, cards):
-#         self.cards = []
-#
-#         if cards:
-#             for card in cards:
-#                 self.add_card(card)
-#
-#     def add_card(self, card):
-#         self.cards.append(DoctorCardDB(card))
-
-
 def doctors_db_request(db: cursor, data: DoctorListing, service_id: int) -> DoctorListing:
 
     cards_num = len(data.doctor_cards)

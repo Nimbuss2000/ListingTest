@@ -3,15 +3,6 @@ from pydantic import Field
 from pydantic.dataclasses import dataclass
 
 
-# Examples
-# http://web-api.larionov.polygon.dev-napopravku.ru/api-internal/doctors/?city_code=spb&sort_by=appointment&with_meta=1&page=1&per_page=20&only_sign=0&only_high_rating=0&speciality_id=6480&age_type=adult
-# http://web-api.larionov.polygon.dev-napopravku.ru/api-internal/clinics/?city_code=spb&sort_by=appointment&with_meta=1&page=1&per_page=20&only_sign=0&only_high_rating=0&service_id=934554&is_all_day=0&section_name=service
-
-# class QueriesEnum(Enum):
-#     @classmethod
-#     def values(cls) -> tuple:
-#         return tuple(item.value for item in cls)
-
 class Listings(Enum):
     doctors = 'doctors'
     clinics = 'clinics'
@@ -59,7 +50,6 @@ class DoctorsQueryBuilder:
             else:
                 params_list.append(f'{param}={value}')
 
-        # return '?'+'&'.join([f'{param}={value}' for param, value in self.__dict__.items()])
         return '?'+'&'.join(params_list)
 
 

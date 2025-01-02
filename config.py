@@ -9,3 +9,10 @@ class BaseConfig:
         "password": DB_PASS,
         "port": "5024"
     }
+
+
+speciality_service = {
+    'specialities':   [6427,    6457,    6480,    6478],
+    'services':       [1134067, 1134064, 1134075, 1134082],
+    'child_services': [1653436, 1653439, 1653428, 1653421]
+}

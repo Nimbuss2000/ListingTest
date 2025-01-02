@@ -1,9 +1,6 @@
 import pytest
-import requests
 import psycopg2
-
 from config import BaseConfig
-from src import db_query_helper
 
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -21,17 +18,6 @@ def db_con():
     cursor.close()
     db.close()
 
-
-@pytest.fixture(scope='module')
-def db_get_data(db_con):
-    def get_request_data(items):
-        s = "'" + "','".join(items) + "'"
-        q = db_query_helper.query_doctors.format(s)
-        db_con.execute(q)
-        data = db_con.fetchall()
-        db_cards = [db_query_helper.DoctorFromDb(row) for row in data]
-        return db_cards
-    yield get_request_data
 
 
 

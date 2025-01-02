@@ -1,10 +1,7 @@
 import requests
-from typing import Optional, TYPE_CHECKING, TypeVar, Type, Union
+from typing import Optional, Type, Union
 from config import BaseConfig
-from tests.utils.urls import DoctorsQueryBuilder
-from pydantic import BaseModel, field_validator, Field
-from collections import defaultdict, Counter
-from dataclasses import dataclass
+from tests.utils.urls import DoctorsQueryBuilder, Ages
 
 
 class NestedCard:
@@ -116,7 +113,6 @@ class DoctorListing:
         return wps_eq and doc_eq
 
 
-
 def parse_response_data(data: dict) -> Optional[DoctorListing]:
     listing_items: Optional[list] = data.get('items', None)
     if listing_items is None:
@@ -133,3 +129,39 @@ def get_response(url_query: dict[str: str], listing: str) -> requests.Response:
     url = "/".join((BaseConfig.base_url, listing))
     return requests.get(url, params=url_query)
 
+
+class Case:
+    spec: int
+    serv: int
+    page: int
+
+    def __init__(self, spec, serv, page):
+        self.spec = spec
+        self.serv = serv
+        self.page = page
+
+
+def generate_parametrize(spec_serv, listing) -> (list[Case], list[Case]):
+    cases: list[Case] = []
+    cases_child: list[Case] = []
+
+    for spec, serv, c_serv in zip(spec_serv['specialities'], spec_serv['services'], spec_serv['child_services']):
+        query = DoctorsQueryBuilder(speciality_id=spec)
+        r = get_response(query.get_dict(), listing)
+        if r.status_code == 200:
+            r = r.json()
+            lp = r['data'].get('last_page', None)
+
+            step = int(lp/100*20)
+            cases = cases + [Case(spec, serv, page) for page in list(range(1, lp, step))]
+
+        query = DoctorsQueryBuilder(speciality_id=spec, age_type=Ages.child.value)
+        r = get_response(query.get_dict(), listing)
+        if r.status_code == 200:
+            r = r.json()
+            lp = r['data'].get('last_page', None)
+
+            step = int(lp/100*20)
+            cases_child = cases_child + [Case(spec, c_serv, page) for page in list(range(1, lp, step))]
+
+    return cases, cases_child
