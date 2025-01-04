@@ -1,4 +1,8 @@
+from ctypes.wintypes import tagSIZE
+
 import requests
+import asyncio
+import aiohttp
 from typing import Optional, Type, Union
 from config import BaseConfig
 from tests.utils.urls import DoctorsQueryBuilder, Ages
@@ -141,27 +145,88 @@ class Case:
         self.page = page
 
 
-def generate_parametrize(spec_serv, listing) -> (list[Case], list[Case]):
+async def fetch_single_url(session, url, spec, serv):
+    try:
+        async with session.get(url) as response:
+            lp = await response.json()
+            # step = int(lp['data']['last_page'] / 100 * 20)
+            # return [Case(spec=spec, serv=serv, page=p) for p in list(range(1, lp['data']['last_page'], step))]
+            return lp['data']['last_page']
+    except Exception as e:
+        # return f'Error fetching {url}: {e}'
+        return None
+
+
+async def fetch_data_async(cases_adult, cases_child):
+    async with aiohttp.ClientSession() as session:
+        tasks_adult = [fetch_single_url(session, c['url'], c['spec'], c['serv']) for c in cases_adult]
+        tasks_child = [fetch_single_url(session, c['url'], c['spec'], c['serv']) for c in cases_child]
+        result = await asyncio.gather(*tasks_adult, *tasks_child)
+        return result[:len(cases_adult)], result[len(cases_adult):]
+
+
+import time
+
+def generate_parametrize(spec_serv, listing): # -> (list[Case], list[Case]):
+
+    # t1 = time.time()
+
     cases: list[Case] = []
     cases_child: list[Case] = []
 
-    for spec, serv, c_serv in zip(spec_serv['specialities'], spec_serv['services'], spec_serv['child_services']):
-        query = DoctorsQueryBuilder(speciality_id=spec)
-        r = get_response(query.get_dict(), listing)
-        if r.status_code == 200:
-            r = r.json()
-            lp = r['data'].get('last_page', None)
+    base_url = "/".join((BaseConfig.base_url, listing))
+    adult = []
+    child = []
 
-            step = int(lp/100*20)
-            cases = cases + [Case(spec, serv, page) for page in list(range(1, lp, step))]
+    for spec, serv, child_serv in zip(spec_serv['specialities'], spec_serv['services'], spec_serv['child_services']):
+        if serv:
+            url = base_url + DoctorsQueryBuilder(speciality_id=spec).get_query()
+            adult.append({'url': url, 'spec': spec, 'serv': serv})
+        if child_serv:
+            url = base_url + DoctorsQueryBuilder(speciality_id=spec, age_type=Ages.child.value).get_query()
+            child.append({'url': url, 'spec': spec, 'serv': child_serv})
 
-        query = DoctorsQueryBuilder(speciality_id=spec, age_type=Ages.child.value)
-        r = get_response(query.get_dict(), listing)
-        if r.status_code == 200:
-            r = r.json()
-            lp = r['data'].get('last_page', None)
+    r_adult, r_child = asyncio.run(fetch_data_async(adult, child))
 
-            step = int(lp/100*20)
-            cases_child = cases_child + [Case(spec, c_serv, page) for page in list(range(1, lp, step))]
+    for i, j in zip(adult, r_adult):
+        step = int(j / 100 * 20)
+        cases = cases + [Case(spec=i['spec'], serv=i['serv'], page=p) for p in list(range(1, j, step))]
+    for i, j in zip(child, r_child):
+        step = int(j / 100 * 20)
+        cases_child = cases_child + [Case(spec=i['spec'], serv=i['serv'], page=p) for p in list(range(1, j, step))]
 
-    return cases, cases_child
+    # t2 = time.time()
+    # diff = t2 - t1
+
+    return cases, cases_child #, diff
+
+    # t1 = time.time()
+    #
+    # cases: list[Case] = []
+    # cases_child: list[Case] = []
+    #
+    # for spec, serv, c_serv in zip(spec_serv['specialities'], spec_serv['services'], spec_serv['child_services']):
+    #     query = DoctorsQueryBuilder(speciality_id=spec)
+    #     r = get_response(query.get_dict(), listing)
+    #     if r.status_code == 200:
+    #         r = r.json()
+    #         lp = r['data'].get('last_page', None)
+    #
+    #         if lp > 0:
+    #             step = int(lp/100*20)
+    #             cases = cases + [Case(spec, serv, page) for page in list(range(1, lp, step))]
+    #
+    #     query = DoctorsQueryBuilder(speciality_id=spec, age_type=Ages.child.value)
+    #     r = get_response(query.get_dict(), listing)
+    #     if r.status_code == 200:
+    #         r = r.json()
+    #         lp = r['data'].get('last_page', None)
+    #
+    #         if lp > 0:
+    #             step = int(lp/100*20)
+    #             cases_child = cases_child + [Case(spec, c_serv, page) for page in list(range(1, lp, step))]
+    #
+    # t2 = time.time()
+    # diff = t2 - t1
+    #
+    # return cases, cases_child, diff
